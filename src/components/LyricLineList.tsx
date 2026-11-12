@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useCenterOnActive } from '../hooks/useCenterOnActive';
 import {
   formatTimestampInput,
   parseTimeInput,
@@ -79,11 +80,11 @@ function TimeEditor({ line, lineNumber, onCommit }: TimeEditorProps) {
   };
 
   const inputClass =
-    'w-[7.5rem] rounded-md border bg-slate-950/80 px-2 py-1 font-mono text-xs tabular-nums text-slate-200 outline-none transition focus:border-emerald-400';
+    'min-w-0 flex-1 rounded-md border bg-slate-950/80 px-2 py-1 font-mono text-xs tabular-nums text-slate-200 outline-none transition focus:border-emerald-400';
 
   return (
-    <div className="flex flex-col items-end gap-1">
-      <div className="flex items-center gap-2">
+    <div className="ml-auto flex w-[17.5rem] max-w-full shrink-0 flex-col items-end gap-1">
+      <div className="flex w-full items-center gap-2">
         <label className="sr-only" htmlFor={`start-${line.id}`}>
           第{lineNumber}行开始时间
         </label>
@@ -108,7 +109,7 @@ function TimeEditor({ line, lineNumber, onCommit }: TimeEditorProps) {
             }
           }}
         />
-        <span className="text-slate-600">→</span>
+        <span className="shrink-0 text-slate-600">→</span>
         <label className="sr-only" htmlFor={`end-${line.id}`}>
           第{lineNumber}行结束时间
         </label>
@@ -162,6 +163,8 @@ export function LyricLineList({
   onSelectLine,
   onEditTime,
 }: LyricLineListProps) {
+  const { containerRef, registerItem } = useCenterOnActive(currentLineId);
+
   if (lines.length === 0) {
     return (
       <div className="flex flex-1 items-center justify-center rounded-2xl border border-dashed border-slate-700 text-sm text-slate-500">
@@ -172,8 +175,9 @@ export function LyricLineList({
 
   return (
     <section
+      ref={containerRef}
       aria-label="歌词列表"
-      className="flex-1 overflow-y-auto rounded-2xl border border-slate-800 bg-slate-900/40"
+      className="lyric-scroll min-w-0 flex-1 overflow-x-hidden overflow-y-auto rounded-2xl border border-slate-800 bg-slate-900/40"
     >
       <ol className="divide-y divide-slate-800/80">
         {lines.map((line, index) => {
@@ -184,21 +188,22 @@ export function LyricLineList({
           return (
             <li
               key={line.id}
+              ref={registerItem(line.id)}
               data-testid={`lyric-line-${line.id}`}
               data-current={isCurrent}
               data-invalid={isInvalid}
-              className={`grid grid-cols-[2.5rem_minmax(0,1fr)_auto] items-center gap-3 px-4 py-3 transition ${
+              className={`flex flex-wrap items-center gap-3 px-4 py-3 transition ${
                 isCurrent
                   ? 'border-l-2 border-emerald-400 bg-emerald-400/5'
                   : 'border-l-2 border-transparent hover:bg-slate-800/40'
               } ${isInvalid ? 'ring-1 ring-inset ring-rose-500/70' : ''}`}
               onClick={() => onSelectLine(line.id)}
             >
-              <span className="font-mono text-xs tabular-nums text-slate-500">
+              <span className="w-6 shrink-0 font-mono text-xs tabular-nums text-slate-500">
                 {String(index + 1).padStart(2, '0')}
               </span>
 
-              <div className="min-w-0">
+              <div className="min-w-0 flex-1 basis-48">
                 <p
                   className={`truncate text-sm ${
                     isCurrent ? 'font-semibold text-slate-100' : 'text-slate-300'

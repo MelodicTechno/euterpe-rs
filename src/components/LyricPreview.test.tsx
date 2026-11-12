@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { LyricPreview } from './LyricPreview';
 import { makeLine } from '../test/factories';
@@ -9,11 +9,19 @@ const lines = [
 ];
 
 describe('LyricPreview', () => {
-  it('renders completed and unfinished lines, highlighting the active one', () => {
-    const scrollSpy = vi
+  let scrollIntoView: ReturnType<typeof vi.spyOn>;
+  let scrollTo: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    scrollIntoView = vi
       .spyOn(Element.prototype, 'scrollIntoView')
       .mockImplementation(() => undefined);
+    scrollTo = vi
+      .spyOn(Element.prototype, 'scrollTo')
+      .mockImplementation(() => undefined);
+  });
 
+  it('renders completed and unfinished lines, highlighting the active one', () => {
     render(<LyricPreview lines={lines} activeLineId="a" />);
 
     expect(screen.getByText('已经唱过的行')).toBeInTheDocument();
@@ -26,17 +34,19 @@ describe('LyricPreview', () => {
       'data-active',
       'false',
     );
-    expect(scrollSpy).toHaveBeenCalledWith({
-      block: 'center',
-      behavior: 'smooth',
-    });
+    expect(scrollTo).toHaveBeenCalledWith({ top: 0, behavior: 'smooth' });
+    expect(scrollTo.mock.instances[0]).toBe(
+      screen.getByLabelText('歌词预览'),
+    );
+    expect(scrollIntoView).not.toHaveBeenCalled();
   });
 
-  it('moves the highlight when the active line changes', () => {
+  it('moves the highlight and centers the new active line', () => {
     const { rerender } = render(
       <LyricPreview lines={lines} activeLineId="a" />,
     );
 
+    scrollTo.mockClear();
     rerender(<LyricPreview lines={lines} activeLineId="b" />);
 
     expect(screen.getByTestId('preview-line-b')).toHaveAttribute(
@@ -47,11 +57,18 @@ describe('LyricPreview', () => {
       'data-active',
       'false',
     );
+    expect(scrollTo).toHaveBeenCalledWith({ top: 0, behavior: 'smooth' });
+    expect(scrollTo.mock.instances[0]).toBe(
+      screen.getByLabelText('歌词预览'),
+    );
+    expect(scrollIntoView).not.toHaveBeenCalled();
   });
 
   it('renders without an active line during gaps', () => {
     render(<LyricPreview lines={lines} activeLineId={null} />);
 
+    expect(scrollTo).not.toHaveBeenCalled();
+    expect(scrollIntoView).not.toHaveBeenCalled();
     expect(screen.getByTestId('preview-line-a')).toHaveAttribute(
       'data-active',
       'false',
@@ -60,5 +77,20 @@ describe('LyricPreview', () => {
       'data-active',
       'false',
     );
+  });
+
+  it('keeps long unbroken lyrics inside a non-horizontal container', () => {
+    const longText = 'a'.repeat(300);
+    render(
+      <LyricPreview
+        lines={[makeLine('long', longText)]}
+        activeLineId={null}
+      />,
+    );
+
+    const container = screen.getByLabelText('歌词预览');
+    expect(container).toHaveClass('lyric-scroll');
+    expect(container).toHaveClass('overflow-x-hidden');
+    expect(screen.getByText(longText)).toHaveClass('break-words');
   });
 });

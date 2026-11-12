@@ -10,6 +10,10 @@ if (!Element.prototype.scrollIntoView) {
   Element.prototype.scrollIntoView = vi.fn();
 }
 
+if (!Element.prototype.scrollTo) {
+  Element.prototype.scrollTo = vi.fn();
+}
+
 if (!window.matchMedia) {
   window.matchMedia = ((query: string) => ({
     matches: false,

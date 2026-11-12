@@ -1,12 +1,25 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { useState } from 'react';
 import { LyricLineList } from './LyricLineList';
 import { makeLine } from '../test/factories';
 
 const lines = [makeLine('a', '第一行'), makeLine('b', '第二行', 1000, 2000)];
 
 describe('LyricLineList', () => {
+  let scrollIntoView: ReturnType<typeof vi.spyOn>;
+  let scrollTo: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    scrollIntoView = vi
+      .spyOn(Element.prototype, 'scrollIntoView')
+      .mockImplementation(() => undefined);
+    scrollTo = vi
+      .spyOn(Element.prototype, 'scrollTo')
+      .mockImplementation(() => undefined);
+  });
+
   it('shows status, selects the clicked line and highlights invalid rows', async () => {
     const user = userEvent.setup();
     const onSelectLine = vi.fn();
@@ -127,5 +140,116 @@ describe('LyricLineList', () => {
     await user.tab();
 
     expect(onEditTime).not.toHaveBeenCalled();
+  });
+
+  it('centers the current line on first render', () => {
+    render(
+      <LyricLineList
+        lines={lines}
+        currentLineId="a"
+        onSelectLine={vi.fn()}
+        onEditTime={vi.fn()}
+      />,
+    );
+
+    expect(scrollTo).toHaveBeenCalledWith({ top: 0, behavior: 'smooth' });
+    expect(scrollTo.mock.instances[0]).toBe(
+      screen.getByLabelText('歌词列表'),
+    );
+    expect(scrollIntoView).not.toHaveBeenCalled();
+  });
+
+  it('centers the new current line when it changes', () => {
+    const { rerender } = render(
+      <LyricLineList
+        lines={lines}
+        currentLineId="a"
+        onSelectLine={vi.fn()}
+        onEditTime={vi.fn()}
+      />,
+    );
+
+    scrollTo.mockClear();
+    rerender(
+      <LyricLineList
+        lines={lines}
+        currentLineId="b"
+        onSelectLine={vi.fn()}
+        onEditTime={vi.fn()}
+      />,
+    );
+
+    expect(scrollTo).toHaveBeenCalledWith({ top: 0, behavior: 'smooth' });
+    expect(scrollTo.mock.instances[0]).toBe(
+      screen.getByLabelText('歌词列表'),
+    );
+    expect(scrollIntoView).not.toHaveBeenCalled();
+  });
+
+  it('does not scroll again when the current line is unchanged', () => {
+    const { rerender } = render(
+      <LyricLineList
+        lines={lines}
+        currentLineId="a"
+        onSelectLine={vi.fn()}
+        onEditTime={vi.fn()}
+      />,
+    );
+
+    scrollTo.mockClear();
+    rerender(
+      <LyricLineList
+        lines={lines}
+        currentLineId="a"
+        onSelectLine={vi.fn()}
+        onEditTime={vi.fn()}
+      />,
+    );
+
+    expect(scrollTo).not.toHaveBeenCalled();
+    expect(scrollIntoView).not.toHaveBeenCalled();
+  });
+
+  it('centers the clicked line after it becomes current', async () => {
+    const user = userEvent.setup();
+
+    function Harness() {
+      const [currentId, setCurrentId] = useState('a');
+      return (
+        <LyricLineList
+          lines={lines}
+          currentLineId={currentId}
+          onSelectLine={setCurrentId}
+          onEditTime={vi.fn()}
+        />
+      );
+    }
+
+    render(<Harness />);
+    scrollTo.mockClear();
+
+    await user.click(screen.getByTestId('lyric-line-b'));
+
+    expect(scrollTo).toHaveBeenCalledWith({ top: 0, behavior: 'smooth' });
+    expect(scrollTo.mock.instances[0]).toBe(
+      screen.getByLabelText('歌词列表'),
+    );
+    expect(scrollIntoView).not.toHaveBeenCalled();
+  });
+
+  it('uses a vertical-only scrolling container', () => {
+    render(
+      <LyricLineList
+        lines={lines}
+        currentLineId="a"
+        onSelectLine={vi.fn()}
+        onEditTime={vi.fn()}
+      />,
+    );
+
+    const container = screen.getByLabelText('歌词列表');
+    expect(container).toHaveClass('lyric-scroll');
+    expect(container).toHaveClass('overflow-x-hidden');
+    expect(container).toHaveClass('overflow-y-auto');
   });
 });

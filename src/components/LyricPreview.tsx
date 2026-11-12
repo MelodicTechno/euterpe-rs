@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useCenterOnActive } from '../hooks/useCenterOnActive';
 import { isCompletedLine } from '../lib/srt';
 import type { LyricLine } from '../state/types';
 
@@ -8,31 +8,15 @@ interface LyricPreviewProps {
 }
 
 export function LyricPreview({ lines, activeLineId }: LyricPreviewProps) {
-  const lineRefs = useRef(new Map<string, HTMLLIElement>());
-  const userScrolledRef = useRef(false);
-
-  useEffect(() => {
-    userScrolledRef.current = false;
-    if (!activeLineId) {
-      return;
-    }
-    lineRefs.current
-      .get(activeLineId)
-      ?.scrollIntoView({ block: 'center', behavior: 'smooth' });
-  }, [activeLineId]);
+  const { containerRef, registerItem } = useCenterOnActive(activeLineId);
 
   return (
     <section
+      ref={containerRef}
       aria-label="歌词预览"
-      className="flex-1 overflow-y-auto rounded-2xl border border-slate-800 bg-slate-950/60"
-      onWheel={() => {
-        userScrolledRef.current = true;
-      }}
-      onTouchMove={() => {
-        userScrolledRef.current = true;
-      }}
+      className="lyric-scroll min-w-0 flex-1 overflow-x-hidden overflow-y-auto rounded-2xl border border-slate-800 bg-slate-950/60"
     >
-      <ul className="space-y-7 px-6 py-[32vh] text-center">
+      <ul className="min-w-0 space-y-7 px-6 py-[32vh] text-center">
         {lines.map((line) => {
           const completed = isCompletedLine(line);
           const active = line.id === activeLineId;
@@ -40,13 +24,7 @@ export function LyricPreview({ lines, activeLineId }: LyricPreviewProps) {
           return (
             <li
               key={line.id}
-              ref={(element) => {
-                if (element) {
-                  lineRefs.current.set(line.id, element);
-                } else {
-                  lineRefs.current.delete(line.id);
-                }
-              }}
+              ref={registerItem(line.id)}
               data-testid={`preview-line-${line.id}`}
               data-active={active}
               className={`transition-all duration-300 ${
@@ -54,7 +32,7 @@ export function LyricPreview({ lines, activeLineId }: LyricPreviewProps) {
               }`}
             >
               <p
-                className={`text-lg leading-8 transition-colors ${
+                className={`break-words text-lg leading-8 transition-colors [overflow-wrap:anywhere] ${
                   active
                     ? 'font-semibold text-emerald-300'
                     : completed
