@@ -36,8 +36,8 @@ export async function openFiles(): Promise<string[]> {
     directory: false,
     filters: [
       {
-        name: '歌曲与歌词',
-        extensions: ['mp3', 'wav', 'txt'],
+        name: '歌曲、歌词或工程',
+        extensions: ['mp3', 'wav', 'txt', 'eusrt'],
       },
     ],
   });
@@ -56,6 +56,19 @@ export async function saveSrtDialog(
   const target = await save({
     defaultPath: defaultName,
     filters: [{ name: 'SRT 字幕', extensions: ['srt'] }],
+  });
+  return target ?? null;
+}
+
+export async function saveProjectDialog(
+  defaultName: string,
+): Promise<string | null> {
+  if (!isTauri()) {
+    return null;
+  }
+  const target = await save({
+    defaultPath: defaultName,
+    filters: [{ name: 'Euterpe 工程', extensions: ['eusrt'] }],
   });
   return target ?? null;
 }

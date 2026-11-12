@@ -28,7 +28,7 @@ describe('session/loadAudio', () => {
       currentLineId: 'b',
       history,
       revision: 3,
-      exportedRevision: 2,
+      savedRevision: 2,
       mode: 'preview',
     });
 
@@ -42,7 +42,7 @@ describe('session/loadAudio', () => {
     expect(next.currentLineId).toBe('a');
     expect(next.history).toEqual([]);
     expect(next.revision).toBe(0);
-    expect(next.exportedRevision).toBe(0);
+    expect(next.savedRevision).toBe(0);
     expect(next.mode).toBe('edit');
   });
 
@@ -64,7 +64,7 @@ describe('session/loadLyrics', () => {
       lines: [makeLine('old', '旧歌词', 1000, 2000)],
       currentLineId: 'old',
       revision: 4,
-      exportedRevision: 1,
+      savedRevision: 1,
       mode: 'preview',
     });
 
@@ -77,8 +77,156 @@ describe('session/loadLyrics', () => {
     expect(next.lines.map((line) => line.text)).toEqual(['新歌词一', '新歌词二']);
     expect(next.currentLineId).toBe('new-1');
     expect(next.revision).toBe(0);
-    expect(next.exportedRevision).toBe(0);
+    expect(next.savedRevision).toBe(0);
     expect(next.mode).toBe('edit');
+  });
+});
+
+describe('session/loadProject and attachAudio', () => {
+  it('loads a project, its current line and saved revision', () => {
+    const audio = makeAudio();
+    const projectLines = [
+      makeLine('p1', '第一行', 1000, 2000),
+      makeLine('p2', '第二行'),
+    ];
+
+    const next = sessionReducer(
+      makeState({ revision: 7, mode: 'preview' }),
+      {
+        type: 'session/loadProject',
+        audio,
+        lines: projectLines,
+        currentLineId: 'p2',
+        projectPath: 'C:\\out\\song.eusrt',
+      },
+    );
+
+    expect(next.audio).toBe(audio);
+    expect(next.lines).toEqual(projectLines);
+    expect(next.currentLineId).toBe('p2');
+    expect(next.projectPath).toBe('C:\\out\\song.eusrt');
+    expect(next.revision).toBe(0);
+    expect(next.savedRevision).toBe(0);
+    expect(next.history).toEqual([]);
+    expect(next.mode).toBe('edit');
+  });
+
+  it('attaches audio without clearing restored times or project path', () => {
+    const history: TimingEdit[] = [
+      {
+        lineId: 'p1',
+        before: { startMs: null, endMs: null },
+        after: { startMs: 1000, endMs: 2000 },
+        seekToMs: 1000,
+      },
+    ];
+    const state = makeState({
+      audio: null,
+      lines: [makeLine('p1', '第一行', 1000, 2000)],
+      currentLineId: 'p1',
+      history,
+      revision: 3,
+      savedRevision: 3,
+      projectPath: 'C:\\out\\song.eusrt',
+    });
+
+    const next = sessionReducer(state, {
+      type: 'session/attachAudio',
+      audio: makeAudio(),
+    });
+
+    expect(next.audio?.name).toBe('song.mp3');
+    expect(next.lines).toEqual(state.lines);
+    expect(next.currentLineId).toBe('p1');
+    expect(next.history).toBe(history);
+    expect(next.projectPath).toBe('C:\\out\\song.eusrt');
+    expect(next.revision).toBe(4);
+    expect(next.savedRevision).toBe(3);
+  });
+
+  it('detaches the project when manually replacing audio or lyrics', () => {
+    const audioReplaced = sessionReducer(
+      makeState({
+        audio: makeAudio(),
+        lines: [makeLine('a', '第一行', 1000, 2000)],
+        projectPath: 'C:\\out\\old.eusrt',
+        revision: 4,
+        savedRevision: 4,
+      }),
+      { type: 'session/loadAudio', audio: makeAudio({ id: 'new' }) },
+    );
+
+    expect(audioReplaced.projectPath).toBeNull();
+    expect(audioReplaced.savedRevision).toBe(0);
+    expect(audioReplaced.lines[0].startMs).toBeNull();
+
+    const lyricsReplaced = sessionReducer(
+      makeState({
+        audio: makeAudio(),
+        lines: [makeLine('old', '旧歌词', 1000, 2000)],
+        projectPath: 'C:\\out\\old.eusrt',
+        revision: 4,
+        savedRevision: 4,
+      }),
+      { type: 'session/loadLyrics', lines: [makeLine('new', '新歌词')] },
+    );
+
+    expect(lyricsReplaced.projectPath).toBeNull();
+    expect(lyricsReplaced.savedRevision).toBe(0);
+    expect(lyricsReplaced.audio).not.toBeNull();
+  });
+});
+
+describe('timing/clear', () => {
+  it('clears both times and records an undo entry', () => {
+    const state = makeState({
+      lines: [makeLine('a', '第一行', 1000, 2000)],
+      currentLineId: 'a',
+    });
+
+    const next = sessionReducer(state, {
+      type: 'timing/clear',
+      lineId: 'a',
+    });
+
+    expect(next.lines[0]).toEqual(makeLine('a', '第一行'));
+    expect(next.currentLineId).toBe('a');
+    expect(next.history).toEqual([
+      {
+        lineId: 'a',
+        before: { startMs: 1000, endMs: 2000 },
+        after: { startMs: null, endMs: null },
+        seekToMs: 1000,
+      },
+    ]);
+    expect(next.revision).toBe(1);
+  });
+
+  it('clears a started line and can be undone', () => {
+    const started = makeState({
+      lines: [makeLine('a', '第一行', 1000)],
+      currentLineId: 'a',
+    });
+
+    const cleared = sessionReducer(started, {
+      type: 'timing/clear',
+      lineId: 'a',
+    });
+    expect(cleared.lines[0]).toEqual(makeLine('a', '第一行'));
+
+    const undone = sessionReducer(cleared, { type: 'timing/undo' });
+    expect(undone.lines[0]).toEqual(makeLine('a', '第一行', 1000));
+    expect(undone.currentLineId).toBe('a');
+  });
+
+  it('is a no-op for untimed or unknown lines', () => {
+    const state = makeState({ lines: [makeLine('a', '第一行')] });
+    expect(
+      sessionReducer(state, { type: 'timing/clear', lineId: 'a' }),
+    ).toBe(state);
+    expect(
+      sessionReducer(state, { type: 'timing/clear', lineId: 'missing' }),
+    ).toBe(state);
   });
 });
 
@@ -432,11 +580,19 @@ describe('timing/undo', () => {
   });
 });
 
-describe('export and view state', () => {
-  it('marks the current revision as exported', () => {
-    const state = makeState({ revision: 5, exportedRevision: 2 });
-    const next = sessionReducer(state, { type: 'export/succeeded' });
-    expect(next.exportedRevision).toBe(5);
+describe('project and view state', () => {
+  it('records the project path and saved revision', () => {
+    const state = makeState({
+      revision: 5,
+      savedRevision: 2,
+      projectPath: null,
+    });
+    const next = sessionReducer(state, {
+      type: 'project/saved',
+      path: 'C:\\out\\song.eusrt',
+    });
+    expect(next.savedRevision).toBe(5);
+    expect(next.projectPath).toBe('C:\\out\\song.eusrt');
     expect(next.revision).toBe(5);
   });
 

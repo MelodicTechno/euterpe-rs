@@ -17,6 +17,8 @@ describe('file helpers', () => {
     expect(classifyFile('C:\\a\\song.mp3')).toBe('audio');
     expect(classifyFile('C:\\a\\song.WAV')).toBe('audio');
     expect(classifyFile('C:\\a\\lyrics.txt')).toBe('lyrics');
+    expect(classifyFile('C:\\a\\project.eusrt')).toBe('project');
+    expect(classifyFile('C:\\a\\PROJECT.EUSRT')).toBe('project');
     expect(classifyFile('C:\\a\\cover.png')).toBe('unsupported');
     expect(classifyFile('C:\\a\\README')).toBe('unsupported');
   });

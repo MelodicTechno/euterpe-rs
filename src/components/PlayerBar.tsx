@@ -23,25 +23,25 @@ export function PlayerBar({
   return (
     <section
       aria-label="播放器"
-      className="rounded-2xl border border-slate-800 bg-slate-900/70 px-4 py-3 shadow-lg"
+      className="border-b border-line bg-surface px-3 py-2"
     >
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-3">
         <button
           type="button"
           aria-label={isPlaying ? '暂停' : '播放'}
-          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-slate-950 transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-400"
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-sm bg-accent text-white transition hover:bg-accent-strong disabled:cursor-not-allowed disabled:bg-line disabled:text-muted"
           onClick={onToggle}
           disabled={!hasAudio}
         >
-          <span className="text-lg leading-none">{isPlaying ? '❚❚' : '▶'}</span>
+          <span className="text-sm leading-none">{isPlaying ? '❚❚' : '▶'}</span>
         </button>
 
         <div className="min-w-0 flex-1">
-          <div className="mb-2 flex items-baseline justify-between gap-4">
-            <span className="truncate text-sm font-medium text-slate-200">
+          <div className="mb-1 flex items-baseline justify-between gap-4">
+            <span className="truncate text-xs font-medium text-ink">
               {audioName ?? '尚未导入音频'}
             </span>
-            <span className="shrink-0 font-mono text-xs tabular-nums text-slate-400">
+            <span className="shrink-0 font-mono text-[11px] tabular-nums text-muted">
               {formatClock(currentTimeMs)} / {formatClock(durationMs)}
             </span>
           </div>
@@ -53,8 +53,24 @@ export function PlayerBar({
             step={10}
             value={Math.min(currentTimeMs, max)}
             onChange={(event) => onSeek(Number(event.target.value))}
+            onKeyDown={(event) => {
+              if (
+                [
+                  'ArrowLeft',
+                  'ArrowRight',
+                  'ArrowUp',
+                  'ArrowDown',
+                  'PageUp',
+                  'PageDown',
+                  'Home',
+                  'End',
+                ].includes(event.key)
+              ) {
+                event.preventDefault();
+              }
+            }}
             disabled={!hasAudio}
-            className="h-1.5 w-full cursor-pointer appearance-none rounded-full bg-slate-700 accent-emerald-400 disabled:cursor-not-allowed"
+            className="progress-range w-full cursor-pointer disabled:cursor-not-allowed disabled:opacity-60"
           />
         </div>
       </div>

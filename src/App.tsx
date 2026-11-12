@@ -7,23 +7,49 @@ import {
   useState,
 } from 'react';
 import { ConfirmDialog } from './components/ConfirmDialog';
-import { ExportBar } from './components/ExportBar';
 import { ImportDropzone } from './components/ImportDropzone';
+import { InfoDialog } from './components/InfoDialog';
 import { LyricLineList } from './components/LyricLineList';
 import { LyricPreview } from './components/LyricPreview';
 import { PlayerBar } from './components/PlayerBar';
+import { PreviewBar } from './components/PreviewBar';
 import { Toast, type ToastKind, type ToastMessage } from './components/Toast';
+import { useAppMenu } from './hooks/useAppMenu';
 import { useAudioPlayer } from './hooks/useAudioPlayer';
 import { useFileDrop } from './hooks/useFileDrop';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
-import { openFiles, ping, readFileBytes } from './ipc/files';
+import { useWindowTitle } from './hooks/useWindowTitle';
+import { getCurrentWindow } from '@tauri-apps/api/window';
+import {
+  openFiles,
+  ping,
+  readFileBytes,
+  saveProjectDialog,
+  saveSrtDialog,
+  writeTextAtomic,
+} from './ipc/files';
 import { getErrorMessage } from './lib/errors';
 import { createId } from './lib/id';
-import { classifyFile, getFileName } from './lib/import';
-import { createLyricLines, decodeUtf8, splitLyrics } from './lib/lyrics';
 import {
+  classifyFile,
+  deriveSrtName,
+  getFileName,
+} from './lib/import';
+import { createLyricLines, decodeUtf8, splitLyrics } from './lib/lyrics';
+import { findPreFirstLineId } from './lib/preview';
+import {
+  deriveProjectFileName,
+  ensureProjectExtension,
+  parseProject,
+  serializeProject,
+} from './lib/project';
+import { toSrt, validateForExport } from './lib/srt';
+import {
+  canPreview,
   getActiveLineId,
   getCompletedCount,
+  getWindowTitle,
+  hasSessionContent,
   hasUnsavedChanges,
 } from './state/selectors';
 import {
@@ -40,7 +66,10 @@ export default function App() {
   const [toast, setToast] = useState<ToastMessage | null>(null);
   const toastCounter = useRef(0);
   const [pendingPaths, setPendingPaths] = useState<string[] | null>(null);
-  const [busy, setBusy] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const [infoDialog, setInfoDialog] = useState<'shortcuts' | 'about' | null>(
+    null,
+  );
   const [invalidLineIds, setInvalidLineIds] = useState<string[]>([]);
 
   const notify = useCallback((kind: ToastKind, text: string) => {
@@ -57,9 +86,70 @@ export default function App() {
 
   const player = useAudioPlayer(state.audio, handleAudioError);
 
+  const applyProject = useCallback(
+    async (path: string) => {
+      const bytes = await readFileBytes(path);
+      const decoded = decodeUtf8(bytes);
+      if (!decoded.ok) {
+        notify('error', '工程文件不是有效的 UTF-8 文本。');
+        return;
+      }
+
+      const parsed = parseProject(decoded.text);
+      if (!parsed.ok) {
+        notify('error', parsed.error);
+        return;
+      }
+
+      let audio: AudioTrack | null = null;
+      let audioMissing = false;
+      if (parsed.project.audio) {
+        try {
+          const audioBytes = await readFileBytes(parsed.project.audio.path);
+          audio = {
+            id: createId('audio'),
+            path: parsed.project.audio.path,
+            name: parsed.project.audio.name,
+            bytes: audioBytes,
+            durationMs: parsed.project.audio.durationMs,
+          };
+        } catch {
+          audioMissing = true;
+        }
+      }
+
+      const lines = parsed.project.lyrics.map((line) => ({
+        id: createId('line'),
+        text: line.text,
+        startMs: line.startMs,
+        endMs: line.endMs,
+      }));
+      const requested = lines[parsed.project.currentLineIndex];
+      const current =
+        requested ?? lines.find((line) => line.endMs === null) ?? lines[0] ?? null;
+
+      player.pause();
+      dispatch({
+        type: 'session/loadProject',
+        audio,
+        lines,
+        currentLineId: current?.id ?? null,
+        projectPath: path,
+      });
+      setInvalidLineIds([]);
+
+      if (audioMissing) {
+        notify(
+          'warning',
+          '已恢复歌词与时间，但音频文件无法读取，请重新导入音频。',
+        );
+      }
+    },
+    [notify, player],
+  );
+
   const applyImport = useCallback(
     async (paths: string[]) => {
-      setBusy(true);
       try {
         const classified = paths.map((path) => ({
           path,
@@ -73,8 +163,23 @@ export default function App() {
           const names = unsupported.map((item) => getFileName(item.path));
           notify(
             'error',
-            `不支持的文件：${names.join('、')}。请使用 mp3 / wav 音频或 txt 歌词。`,
+            `不支持的文件：${names.join('、')}。请使用 mp3 / wav 音频、txt 歌词或 .eusrt 工程。`,
           );
+          return;
+        }
+
+        const projectPaths = classified
+          .filter((item) => item.kind === 'project')
+          .map((item) => item.path);
+        if (projectPaths.length > 0) {
+          if (classified.length > 1) {
+            notify(
+              'error',
+              '一次只能打开一个工程，不能与音频或歌词同时导入。',
+            );
+            return;
+          }
+          await applyProject(projectPaths[0]);
           return;
         }
 
@@ -121,27 +226,22 @@ export default function App() {
 
         if (nextTrack) {
           player.pause();
-          dispatch({ type: 'session/loadAudio', audio: nextTrack });
+          dispatch(
+            state.audio
+              ? { type: 'session/loadAudio', audio: nextTrack }
+              : { type: 'session/attachAudio', audio: nextTrack },
+          );
         }
         if (nextLines) {
           dispatch({ type: 'session/loadLyrics', lines: nextLines });
         }
 
         setInvalidLineIds([]);
-        if (nextTrack && nextLines) {
-          notify('success', '已导入歌曲与歌词，按空格开始打点。');
-        } else if (nextTrack) {
-          notify('success', '已导入音频。');
-        } else if (nextLines) {
-          notify('success', '已导入歌词，按空格开始打点。');
-        }
       } catch (error) {
         notify('error', getErrorMessage(error, '导入失败，请重试。'));
-      } finally {
-        setBusy(false);
       }
     },
-    [notify, player],
+    [applyProject, notify, player, state.audio],
   );
 
   const requestImport = useCallback(
@@ -169,27 +269,94 @@ export default function App() {
     }
   }, [notify, requestImport]);
 
+  const saveProject = useCallback(
+    async (forceDialog: boolean) => {
+      if (!hasSessionContent(state)) {
+        return;
+      }
+
+      try {
+        const target =
+          forceDialog || !state.projectPath
+            ? await saveProjectDialog(
+                deriveProjectFileName(state.audio?.name ?? null),
+              )
+            : state.projectPath;
+        if (!target) {
+          return;
+        }
+
+        const path = ensureProjectExtension(target);
+        await writeTextAtomic(
+          path,
+          serializeProject({
+            audio: state.audio,
+            lines: state.lines,
+            currentLineId: state.currentLineId,
+          }),
+        );
+        dispatch({ type: 'project/saved', path });
+      } catch (error) {
+        notify('error', getErrorMessage(error, '保存工程失败，请重试。'));
+      }
+    },
+    [notify, state],
+  );
+
+  const handleExportSrt = useCallback(async () => {
+    if (exporting) {
+      return;
+    }
+
+    const validation = validateForExport(state.lines);
+    if (!validation.ok) {
+      setInvalidLineIds(validation.invalidLineIds);
+      notify(
+        'error',
+        validation.completedCount === 0
+          ? '需要先完成至少一行打点才能导出。'
+          : '存在结束时间不晚于开始时间的行，请先修正后再导出。',
+      );
+      return;
+    }
+
+    if (!state.audio) {
+      notify('error', '请先导入音频。');
+      return;
+    }
+
+    setExporting(true);
+    try {
+      const target = await saveSrtDialog(deriveSrtName(state.audio.name));
+      if (!target) {
+        return;
+      }
+      await writeTextAtomic(target, toSrt(state.lines));
+      setInvalidLineIds([]);
+    } catch (error) {
+      notify('error', getErrorMessage(error, '导出失败，请重试。'));
+    } finally {
+      setExporting(false);
+    }
+  }, [exporting, notify, state]);
+
   const isDragging = useFileDrop(requestImport);
 
   const handleTogglePlay = useCallback(() => {
     if (!state.audio) {
-      notify('info', '请先导入音频。');
       return;
     }
     player.toggle();
-  }, [notify, player, state.audio]);
+  }, [player, state.audio]);
 
   const handleSpace = useCallback(() => {
     if (!state.audio) {
-      notify('info', '请先导入音频。');
       return;
     }
     if (state.lines.length === 0) {
-      notify('info', '请先导入歌词文本。');
       return;
     }
     if (!player.isPlaying) {
-      notify('info', '请先开始播放（P 键）再打点。');
       return;
     }
 
@@ -197,7 +364,6 @@ export default function App() {
       (line) => line.id === state.currentLineId,
     );
     if (!current) {
-      notify('info', '所有歌词已完成打点，可预览或导出。');
       return;
     }
 
@@ -213,33 +379,75 @@ export default function App() {
       return;
     }
 
-    const remaining = state.lines.filter(
-      (line) => line.id !== current.id && line.endMs === null,
-    ).length;
     dispatch({ type: 'timing/end', lineId: current.id, atMs });
-
-    if (remaining === 0) {
-      notify('success', '所有歌词打点完成，可预览或导出。');
-    }
   }, [notify, player, state]);
 
   const handleUndo = useCallback(() => {
     const last = state.history[state.history.length - 1];
     if (!last) {
-      notify('info', '没有可回滚的操作。');
       return;
     }
     dispatch({ type: 'timing/undo' });
     if (last.seekToMs !== null) {
       player.seek(last.seekToMs);
     }
-    notify('info', '已回滚上一次修改。');
-  }, [notify, player, state.history]);
+  }, [player, state.history]);
+
+  const handleClearLine = useCallback(() => {
+    if (state.mode !== 'edit') {
+      return;
+    }
+
+    const current = state.lines.find(
+      (line) => line.id === state.currentLineId,
+    );
+    if (!current) {
+      return;
+    }
+    if (current.startMs === null && current.endMs === null) {
+      return;
+    }
+
+    dispatch({ type: 'timing/clear', lineId: current.id });
+  }, [state]);
+
+  useAppMenu({
+    onImport: () => {
+      void handlePick();
+    },
+    onSave: () => {
+      void saveProject(false);
+    },
+    onSaveAs: () => {
+      void saveProject(true);
+    },
+    onExport: () => {
+      void handleExportSrt();
+    },
+    onExit: () => {
+      void getCurrentWindow().close();
+    },
+    onShowShortcuts: () => setInfoDialog('shortcuts'),
+    onShowAbout: () => setInfoDialog('about'),
+  });
 
   useKeyboardShortcuts({
     onTogglePlay: handleTogglePlay,
     onSpace: handleSpace,
     onUndo: handleUndo,
+    onClearLine: handleClearLine,
+    onImport: () => {
+      void handlePick();
+    },
+    onSave: () => {
+      void saveProject(false);
+    },
+    onSaveAs: () => {
+      void saveProject(true);
+    },
+    onExport: () => {
+      void handleExportSrt();
+    },
   });
 
   useEffect(() => {
@@ -259,6 +467,15 @@ export default function App() {
     void ping().catch(() => undefined);
   }, []);
 
+  useEffect(() => {
+    const preventContextMenu = (event: MouseEvent) => {
+      event.preventDefault();
+    };
+    window.addEventListener('contextmenu', preventContextMenu);
+    return () =>
+      window.removeEventListener('contextmenu', preventContextMenu);
+  }, []);
+
   const completedCount = useMemo(
     () => getCompletedCount(state.lines),
     [state.lines],
@@ -267,45 +484,16 @@ export default function App() {
     state.mode === 'preview'
       ? getActiveLineId(state.lines, player.currentTimeMs)
       : null;
+  const centerLineId =
+    state.mode === 'preview'
+      ? (activeLineId ??
+        findPreFirstLineId(state.lines, player.currentTimeMs))
+      : null;
   const showEmptyState = !state.audio && state.lines.length === 0;
-  const dirty = hasUnsavedChanges(state);
+  useWindowTitle(getWindowTitle(state));
 
   return (
-    <div className="flex h-full flex-col gap-4 overflow-hidden bg-gradient-to-b from-slate-950 via-slate-950 to-slate-900 p-5">
-      <header className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-lg font-semibold tracking-wide text-slate-100">
-            SRT Tool <span className="text-emerald-400">·</span> 歌词打轴器
-          </h1>
-          <p className="mt-0.5 text-xs text-slate-500">
-            空格记录开始 / 结束 · P 播放暂停 · O 回滚
-          </p>
-        </div>
-
-        <div className="flex items-center gap-3">
-          {dirty ? (
-            <span className="rounded-full border border-amber-400/40 bg-amber-400/10 px-2.5 py-1 text-[11px] text-amber-300">
-              有未导出更改
-            </span>
-          ) : state.revision > 0 ? (
-            <span className="rounded-full border border-emerald-400/40 bg-emerald-400/10 px-2.5 py-1 text-[11px] text-emerald-300">
-              已导出
-            </span>
-          ) : null}
-
-          <button
-            type="button"
-            className="rounded-lg border border-slate-600 px-4 py-2 text-sm text-slate-200 transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
-            onClick={() => {
-              void handlePick();
-            }}
-            disabled={busy}
-          >
-            {busy ? '正在读取…' : '导入文件'}
-          </button>
-        </div>
-      </header>
-
+    <div className="flex h-full flex-col overflow-hidden bg-canvas text-ink">
       {state.audio && (
         <PlayerBar
           audioName={state.audio.name}
@@ -319,15 +507,13 @@ export default function App() {
 
       <main className="flex min-h-0 flex-1 flex-col">
         {state.mode === 'preview' ? (
-          <LyricPreview lines={state.lines} activeLineId={activeLineId} />
-        ) : showEmptyState ? (
-          <ImportDropzone
-            onPick={() => {
-              void handlePick();
-            }}
-            disabled={busy}
-            isDragging={isDragging}
+          <LyricPreview
+            lines={state.lines}
+            activeLineId={activeLineId}
+            centerLineId={centerLineId}
           />
+        ) : showEmptyState ? (
+          <ImportDropzone isDragging={isDragging} />
         ) : (
           <LyricLineList
             lines={state.lines}
@@ -349,24 +535,19 @@ export default function App() {
       </main>
 
       {!showEmptyState && (
-        <ExportBar
-          lines={state.lines}
-          audioName={state.audio?.name ?? null}
+        <PreviewBar
           mode={state.mode}
+          canPreview={canPreview(state.lines)}
           onPreview={() => dispatch({ type: 'view/setMode', mode: 'preview' })}
-          onExitPreview={() => dispatch({ type: 'view/setMode', mode: 'edit' })}
-          onExported={() => {
-            dispatch({ type: 'export/succeeded' });
-            setInvalidLineIds([]);
-          }}
-          onInvalidLines={setInvalidLineIds}
-          onNotify={notify}
+          onExitPreview={() =>
+            dispatch({ type: 'view/setMode', mode: 'edit' })
+          }
         />
       )}
 
       {isDragging && !showEmptyState && (
-        <div className="pointer-events-none fixed inset-0 z-30 flex items-center justify-center bg-emerald-500/10 backdrop-blur-sm">
-          <div className="rounded-2xl border-2 border-dashed border-emerald-400 bg-slate-950/85 px-10 py-6 text-lg font-medium text-emerald-200 shadow-2xl">
+        <div className="pointer-events-none fixed inset-0 z-30 flex items-center justify-center bg-accent/10">
+          <div className="border border-dashed border-accent bg-surface px-8 py-5 text-sm font-medium text-accent-strong">
             松开鼠标以导入文件
           </div>
         </div>
@@ -377,7 +558,7 @@ export default function App() {
       {pendingPaths && (
         <ConfirmDialog
           title="替换当前内容？"
-          message="当前存在尚未导出的歌词时间。导入新文件会替换现有音频或歌词并清空已记录的时间，确定继续吗？"
+          message="当前存在尚未保存到工程的修改。导入新文件或工程会替换当前会话内容，确定继续吗？"
           onCancel={() => setPendingPaths(null)}
           onConfirm={() => {
             const paths = pendingPaths;
@@ -385,6 +566,40 @@ export default function App() {
             void applyImport(paths);
           }}
         />
+      )}
+
+      {infoDialog === 'shortcuts' && (
+        <InfoDialog
+          title="Keyboard Shortcuts"
+          onClose={() => setInfoDialog(null)}
+        >
+          <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1">
+            <dt className="font-mono text-ink">Space</dt>
+            <dd>记录当前行开始 / 结束</dd>
+            <dt className="font-mono text-ink">P</dt>
+            <dd>播放 / 暂停</dd>
+            <dt className="font-mono text-ink">O</dt>
+            <dd>回滚最近一次修改</dd>
+            <dt className="font-mono text-ink">R</dt>
+            <dd>清空当前行时间戳</dd>
+            <dt className="font-mono text-ink">Ctrl+O</dt>
+            <dd>导入文件</dd>
+            <dt className="font-mono text-ink">Ctrl+S</dt>
+            <dd>保存工程</dd>
+            <dt className="font-mono text-ink">Ctrl+Shift+S</dt>
+            <dd>另存为工程</dd>
+            <dt className="font-mono text-ink">Ctrl+E</dt>
+            <dd>导出 SRT</dd>
+          </dl>
+        </InfoDialog>
+      )}
+
+      {infoDialog === 'about' && (
+        <InfoDialog title="About Euterpe" onClose={() => setInfoDialog(null)}>
+          <p className="font-medium text-ink">Euterpe · 歌词打轴器</p>
+          <p className="mt-1">本地歌词打点与 SRT 导出工具。</p>
+          <p className="mt-1">版本 0.1.0</p>
+        </InfoDialog>
       )}
 
       <span className="sr-only" aria-live="polite">

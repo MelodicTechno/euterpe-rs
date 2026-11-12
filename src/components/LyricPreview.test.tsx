@@ -22,7 +22,7 @@ describe('LyricPreview', () => {
   });
 
   it('renders completed and unfinished lines, highlighting the active one', () => {
-    render(<LyricPreview lines={lines} activeLineId="a" />);
+    render(<LyricPreview lines={lines} activeLineId="a" centerLineId="a" />);
 
     expect(screen.getByText('已经唱过的行')).toBeInTheDocument();
     expect(screen.getByText('（未完成打点）')).toBeInTheDocument();
@@ -43,11 +43,11 @@ describe('LyricPreview', () => {
 
   it('moves the highlight and centers the new active line', () => {
     const { rerender } = render(
-      <LyricPreview lines={lines} activeLineId="a" />,
+      <LyricPreview lines={lines} activeLineId="a" centerLineId="a" />,
     );
 
     scrollTo.mockClear();
-    rerender(<LyricPreview lines={lines} activeLineId="b" />);
+    rerender(<LyricPreview lines={lines} activeLineId="b" centerLineId="b" />);
 
     expect(screen.getByTestId('preview-line-b')).toHaveAttribute(
       'data-active',
@@ -65,7 +65,9 @@ describe('LyricPreview', () => {
   });
 
   it('renders without an active line during gaps', () => {
-    render(<LyricPreview lines={lines} activeLineId={null} />);
+    render(
+      <LyricPreview lines={lines} activeLineId={null} centerLineId={null} />,
+    );
 
     expect(scrollTo).not.toHaveBeenCalled();
     expect(scrollIntoView).not.toHaveBeenCalled();
@@ -79,12 +81,34 @@ describe('LyricPreview', () => {
     );
   });
 
+  it('centers the center line without highlighting it', () => {
+    const { rerender } = render(
+      <LyricPreview lines={lines} activeLineId={null} centerLineId="a" />,
+    );
+
+    expect(screen.getByTestId('preview-line-a')).toHaveAttribute(
+      'data-active',
+      'false',
+    );
+    expect(scrollTo).toHaveBeenCalledWith({ top: 0, behavior: 'smooth' });
+
+    scrollTo.mockClear();
+    rerender(<LyricPreview lines={lines} activeLineId="b" centerLineId="a" />);
+
+    expect(screen.getByTestId('preview-line-b')).toHaveAttribute(
+      'data-active',
+      'true',
+    );
+    expect(scrollTo).not.toHaveBeenCalled();
+  });
+
   it('keeps long unbroken lyrics inside a non-horizontal container', () => {
     const longText = 'a'.repeat(300);
     render(
       <LyricPreview
         lines={[makeLine('long', longText)]}
         activeLineId={null}
+        centerLineId={null}
       />,
     );
 

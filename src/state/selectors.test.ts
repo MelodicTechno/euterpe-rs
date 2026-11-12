@@ -7,6 +7,8 @@ import {
   getCurrentLine,
   getLineStatus,
   getRemainingCount,
+  getWindowTitle,
+  hasSessionContent,
   hasUnsavedChanges,
 } from './selectors';
 import { makeLine, makeState } from '../test/factories';
@@ -51,12 +53,52 @@ describe('line and session selectors', () => {
     expect(getRemainingCount(lines)).toBe(2);
   });
 
-  it('detects unsaved changes from revisions', () => {
+  it('detects unsaved changes from saved revisions', () => {
     expect(
-      hasUnsavedChanges(makeState({ revision: 2, exportedRevision: 2 })),
+      hasUnsavedChanges(makeState({ revision: 2, savedRevision: 2 })),
     ).toBe(false);
     expect(
-      hasUnsavedChanges(makeState({ revision: 3, exportedRevision: 2 })),
+      hasUnsavedChanges(makeState({ revision: 3, savedRevision: 2 })),
+    ).toBe(true);
+  });
+
+  it('derives the window title from project and dirty state', () => {
+    expect(getWindowTitle(makeState())).toBe('Euterpe');
+    expect(
+      getWindowTitle(makeState({ lines: [makeLine('a')] })),
+    ).toBe('未命名.eusrt');
+    expect(
+      getWindowTitle(
+        makeState({ lines: [makeLine('a')], revision: 1 }),
+      ),
+    ).toBe('未命名.eusrt*');
+    expect(
+      getWindowTitle(
+        makeState({
+          projectPath: 'C:\\out\\song.eusrt',
+          revision: 2,
+          savedRevision: 2,
+        }),
+      ),
+    ).toBe('song.eusrt');
+    expect(
+      getWindowTitle(
+        makeState({
+          projectPath: 'C:\\out\\song.eusrt',
+          revision: 3,
+          savedRevision: 2,
+        }),
+      ),
+    ).toBe('song.eusrt*');
+  });
+
+  it('detects whether the session has content', () => {
+    expect(hasSessionContent(makeState())).toBe(false);
+    expect(hasSessionContent(makeState({ lines: [makeLine('a')] }))).toBe(
+      true,
+    );
+    expect(
+      hasSessionContent(makeState({ projectPath: 'C:\\out\\song.eusrt' })),
     ).toBe(true);
   });
 

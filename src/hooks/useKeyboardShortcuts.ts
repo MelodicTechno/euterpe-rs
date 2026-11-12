@@ -4,6 +4,11 @@ export interface ShortcutHandlers {
   onTogglePlay: () => void;
   onSpace: () => void;
   onUndo: () => void;
+  onClearLine: () => void;
+  onImport: () => void;
+  onSave: () => void;
+  onSaveAs: () => void;
+  onExport: () => void;
 }
 
 export function isEditableTarget(target: EventTarget | null): boolean {
@@ -46,14 +51,37 @@ export function useKeyboardShortcuts(
       if (event.defaultPrevented || event.repeat) {
         return;
       }
+
+      const key = event.key.toLowerCase();
+
+      if ((event.ctrlKey || event.metaKey) && !event.altKey) {
+        if (key === 's') {
+          event.preventDefault();
+          if (event.shiftKey) {
+            handlersRef.current.onSaveAs();
+          } else {
+            handlersRef.current.onSave();
+          }
+          return;
+        }
+        if (key === 'o') {
+          event.preventDefault();
+          handlersRef.current.onImport();
+          return;
+        }
+        if (key === 'e') {
+          event.preventDefault();
+          handlersRef.current.onExport();
+          return;
+        }
+      }
+
       if (event.ctrlKey || event.metaKey || event.altKey) {
         return;
       }
       if (isEditableTarget(event.target)) {
         return;
       }
-
-      const key = event.key.toLowerCase();
 
       if (key === ' ' || key === 'spacebar') {
         event.preventDefault();
@@ -64,6 +92,9 @@ export function useKeyboardShortcuts(
       } else if (key === 'o') {
         event.preventDefault();
         handlersRef.current.onUndo();
+      } else if (key === 'r') {
+        event.preventDefault();
+        handlersRef.current.onClearLine();
       }
     };
 

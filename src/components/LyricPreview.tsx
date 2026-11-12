@@ -5,18 +5,23 @@ import type { LyricLine } from '../state/types';
 interface LyricPreviewProps {
   lines: LyricLine[];
   activeLineId: string | null;
+  centerLineId: string | null;
 }
 
-export function LyricPreview({ lines, activeLineId }: LyricPreviewProps) {
-  const { containerRef, registerItem } = useCenterOnActive(activeLineId);
+export function LyricPreview({
+  lines,
+  activeLineId,
+  centerLineId,
+}: LyricPreviewProps) {
+  const { containerRef, registerItem } = useCenterOnActive(centerLineId);
 
   return (
     <section
       ref={containerRef}
       aria-label="歌词预览"
-      className="lyric-scroll min-w-0 flex-1 overflow-x-hidden overflow-y-auto rounded-2xl border border-slate-800 bg-slate-950/60"
+      className="lyric-scroll min-w-0 flex-1 overflow-x-hidden overflow-y-auto bg-surface"
     >
-      <ul className="min-w-0 space-y-7 px-6 py-[32vh] text-center">
+      <ul className="min-w-0 space-y-6 px-6 py-[32vh] text-center">
         {lines.map((line) => {
           const completed = isCompletedLine(line);
           const active = line.id === activeLineId;
@@ -27,23 +32,23 @@ export function LyricPreview({ lines, activeLineId }: LyricPreviewProps) {
               ref={registerItem(line.id)}
               data-testid={`preview-line-${line.id}`}
               data-active={active}
-              className={`transition-all duration-300 ${
-                active ? 'scale-105' : 'scale-100'
-              }`}
+              className="transition-colors duration-150"
             >
               <p
-                className={`break-words text-lg leading-8 transition-colors [overflow-wrap:anywhere] ${
+                className={`break-words text-base leading-7 transition-colors [overflow-wrap:anywhere] ${
                   active
-                    ? 'font-semibold text-emerald-300'
+                    ? 'font-semibold text-accent-strong'
                     : completed
-                      ? 'text-slate-300'
-                      : 'text-slate-600'
+                      ? 'text-ink'
+                      : 'text-muted'
                 }`}
               >
                 {line.text}
               </p>
               {!completed && (
-                <p className="mt-1 text-xs text-amber-400/70">（未完成打点）</p>
+                <p className="mt-1 text-[11px] text-warning/80">
+                  （未完成打点）
+                </p>
               )}
             </li>
           );

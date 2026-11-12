@@ -13,13 +13,22 @@ export const initialSessionState: SessionState = {
   currentLineId: null,
   history: [],
   revision: 0,
-  exportedRevision: 0,
+  savedRevision: 0,
+  projectPath: null,
   mode: 'edit',
 };
 
 export type SessionAction =
   | { type: 'session/loadAudio'; audio: AudioTrack }
+  | { type: 'session/attachAudio'; audio: AudioTrack }
   | { type: 'session/loadLyrics'; lines: LyricLine[] }
+  | {
+      type: 'session/loadProject';
+      audio: AudioTrack | null;
+      lines: LyricLine[];
+      currentLineId: string | null;
+      projectPath: string;
+    }
   | { type: 'session/setDuration'; durationMs: number }
   | { type: 'session/reset' }
   | { type: 'timing/selectLine'; lineId: string }
@@ -31,8 +40,9 @@ export type SessionAction =
       startMs: number | null;
       endMs: number | null;
     }
+  | { type: 'timing/clear'; lineId: string }
   | { type: 'timing/undo' }
-  | { type: 'export/succeeded' }
+  | { type: 'project/saved'; path: string }
   | { type: 'view/setMode'; mode: ViewMode };
 
 function normalizeTime(ms: number): number {
@@ -100,7 +110,30 @@ export function sessionReducer(
         currentLineId: lines[0]?.id ?? null,
         history: [],
         revision: 0,
-        exportedRevision: 0,
+        savedRevision: 0,
+        projectPath: null,
+        mode: 'edit',
+      };
+    }
+
+    case 'session/attachAudio': {
+      return {
+        ...state,
+        audio: action.audio,
+        revision: state.revision + 1,
+      };
+    }
+
+    case 'session/loadProject': {
+      return {
+        ...state,
+        audio: action.audio,
+        lines: action.lines,
+        currentLineId: action.currentLineId,
+        history: [],
+        revision: 0,
+        savedRevision: 0,
+        projectPath: action.projectPath,
         mode: 'edit',
       };
     }
@@ -112,7 +145,8 @@ export function sessionReducer(
         currentLineId: action.lines[0]?.id ?? null,
         history: [],
         revision: 0,
-        exportedRevision: 0,
+        savedRevision: 0,
+        projectPath: null,
         mode: 'edit',
       };
     }
@@ -245,6 +279,26 @@ export function sessionReducer(
       };
     }
 
+    case 'timing/clear': {
+      const line = state.lines.find((item) => item.id === action.lineId);
+      if (!line || (line.startMs === null && line.endMs === null)) {
+        return state;
+      }
+
+      const before: TimingSnapshot = {
+        startMs: line.startMs,
+        endMs: line.endMs,
+      };
+      const after: TimingSnapshot = { startMs: null, endMs: null };
+
+      return {
+        ...state,
+        lines: replaceLine(state.lines, line.id, after),
+        history: pushEdit(state, line.id, before, after, before.startMs),
+        revision: state.revision + 1,
+      };
+    }
+
     case 'timing/undo': {
       const last = state.history[state.history.length - 1];
       if (!last) {
@@ -263,8 +317,12 @@ export function sessionReducer(
       };
     }
 
-    case 'export/succeeded':
-      return { ...state, exportedRevision: state.revision };
+    case 'project/saved':
+      return {
+        ...state,
+        projectPath: action.path,
+        savedRevision: state.revision,
+      };
 
     case 'view/setMode':
       return { ...state, mode: action.mode };

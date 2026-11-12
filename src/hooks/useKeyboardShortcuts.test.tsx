@@ -7,22 +7,43 @@ function setup(enabled = true) {
     onTogglePlay: vi.fn(),
     onSpace: vi.fn(),
     onUndo: vi.fn(),
+    onClearLine: vi.fn(),
+    onImport: vi.fn(),
+    onSave: vi.fn(),
+    onSaveAs: vi.fn(),
+    onExport: vi.fn(),
   };
   const view = renderHook(() => useKeyboardShortcuts(handlers, enabled));
   return { handlers, view };
 }
 
 describe('useKeyboardShortcuts', () => {
-  it('maps space, P and O', () => {
+  it('maps space, P, O and R', () => {
     const { handlers } = setup();
 
     fireEvent.keyDown(window, { key: ' ' });
     fireEvent.keyDown(window, { key: 'p' });
     fireEvent.keyDown(window, { key: 'O' });
+    fireEvent.keyDown(window, { key: 'r' });
 
     expect(handlers.onSpace).toHaveBeenCalledTimes(1);
     expect(handlers.onTogglePlay).toHaveBeenCalledTimes(1);
     expect(handlers.onUndo).toHaveBeenCalledTimes(1);
+    expect(handlers.onClearLine).toHaveBeenCalledTimes(1);
+  });
+
+  it('maps Ctrl+O, Ctrl+S, Ctrl+Shift+S and Ctrl+E', () => {
+    const { handlers } = setup();
+
+    fireEvent.keyDown(window, { key: 'o', ctrlKey: true });
+    fireEvent.keyDown(window, { key: 's', ctrlKey: true });
+    fireEvent.keyDown(window, { key: 's', ctrlKey: true, shiftKey: true });
+    fireEvent.keyDown(window, { key: 'e', ctrlKey: true });
+
+    expect(handlers.onImport).toHaveBeenCalledTimes(1);
+    expect(handlers.onSave).toHaveBeenCalledTimes(1);
+    expect(handlers.onSaveAs).toHaveBeenCalledTimes(1);
+    expect(handlers.onExport).toHaveBeenCalledTimes(1);
   });
 
   it('ignores repeated keydown and modifier combinations', () => {
@@ -31,11 +52,13 @@ describe('useKeyboardShortcuts', () => {
     fireEvent.keyDown(window, { key: ' ', repeat: true });
     fireEvent.keyDown(window, { key: 'p', ctrlKey: true });
     fireEvent.keyDown(window, { key: 'o', metaKey: true });
+    fireEvent.keyDown(window, { key: 'r', altKey: true });
     fireEvent.keyDown(window, { key: ' ', altKey: true });
 
     expect(handlers.onSpace).not.toHaveBeenCalled();
     expect(handlers.onTogglePlay).not.toHaveBeenCalled();
     expect(handlers.onUndo).not.toHaveBeenCalled();
+    expect(handlers.onClearLine).not.toHaveBeenCalled();
   });
 
   it('does not trigger while a text input is focused', () => {
@@ -46,9 +69,11 @@ describe('useKeyboardShortcuts', () => {
 
     fireEvent.keyDown(input, { key: ' ' });
     fireEvent.keyDown(input, { key: 'p' });
+    fireEvent.keyDown(input, { key: 'r' });
 
     expect(handlers.onSpace).not.toHaveBeenCalled();
     expect(handlers.onTogglePlay).not.toHaveBeenCalled();
+    expect(handlers.onClearLine).not.toHaveBeenCalled();
   });
 
   it('still triggers when a range slider is focused', () => {

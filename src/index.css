@@ -3,6 +3,17 @@
 @theme {
   --font-sans: "Segoe UI", "Microsoft YaHei", "Noto Sans SC", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "Cascadia Mono", "Consolas", ui-monospace, monospace;
+
+  --color-canvas: #f5f6f7;
+  --color-surface: #ffffff;
+  --color-line: #d8dde3;
+  --color-ink: #1f2933;
+  --color-muted: #6b7280;
+  --color-accent: #6f8faf;
+  --color-accent-strong: #5b7c9d;
+  --color-accent-soft: #e8eef4;
+  --color-warning: #a8843c;
+  --color-error: #b45454;
 }
 
 html,
@@ -14,12 +25,12 @@ body,
 body {
   margin: 0;
   overflow: hidden;
-  background-color: #020617;
-  color: #e2e8f0;
+  background-color: #f5f6f7;
+  color: #1f2933;
 }
 
 ::selection {
-  background-color: rgba(52, 211, 153, 0.35);
+  background-color: rgba(111, 143, 175, 0.25);
 }
 
 .lyric-scroll::-webkit-scrollbar {
@@ -35,17 +46,44 @@ body {
 .lyric-scroll::-webkit-scrollbar-thumb {
   border: 2px solid transparent;
   border-radius: 9999px;
-  background-color: rgba(15, 23, 42, 0.9);
+  background-color: rgba(199, 206, 214, 0.95);
   background-clip: content-box;
 }
 
 .lyric-scroll::-webkit-scrollbar-thumb:hover {
-  background-color: rgba(51, 65, 85, 0.95);
+  background-color: rgba(174, 184, 196, 0.95);
 }
 
 @supports not selector(::-webkit-scrollbar) {
   .lyric-scroll {
     scrollbar-width: thin;
-    scrollbar-color: rgba(15, 23, 42, 0.9) transparent;
+    scrollbar-color: rgba(199, 206, 214, 0.95) transparent;
   }
+}
+
+.progress-range {
+  height: 4px;
+  appearance: none;
+  background-color: #d8dde3;
+  outline: none;
+}
+
+.progress-range:focus,
+.progress-range:focus-visible {
+  outline: none;
+}
+
+.progress-range::-webkit-slider-thumb {
+  width: 10px;
+  height: 14px;
+  appearance: none;
+  border: 0;
+  border-radius: 0;
+  background-color: #6f8faf;
+  cursor: pointer;
+}
+
+.progress-range:disabled::-webkit-slider-thumb {
+  background-color: #c7ced6;
+  cursor: not-allowed;
 }

@@ -1,5 +1,5 @@
 import type { LyricLine } from '../state/types';
-import { isCompletedLine } from './srt';
+import { getExportableLines, isCompletedLine } from './srt';
 
 /**
  * Returns the id of the completed line covering `timeMs`, or null.
@@ -39,4 +39,22 @@ export function findActiveLineId(
   }
 
   return null;
+}
+
+/**
+ * Returns the first lyric line while playback is before every exportable
+ * timestamp, so the preview can rest on the opening line. Returns null once
+ * playback reaches the first timestamp or when there is nothing exportable.
+ */
+export function findPreFirstLineId(
+  lines: LyricLine[],
+  timeMs: number,
+): string | null {
+  const exportable = getExportableLines(lines);
+  if (exportable.length === 0) {
+    return null;
+  }
+
+  const firstStartMs = Math.min(...exportable.map((line) => line.startMs));
+  return timeMs < firstStartMs ? (lines[0]?.id ?? null) : null;
 }

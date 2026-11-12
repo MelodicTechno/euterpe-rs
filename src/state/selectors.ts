@@ -1,5 +1,6 @@
 import { getExportableLines, isCompletedLine } from '../lib/srt';
 import { findActiveLineId } from '../lib/preview';
+import { getFileName } from '../lib/import';
 import type { LineStatus, LyricLine, SessionState } from './types';
 
 export function getLineStatus(line: LyricLine): LineStatus {
@@ -33,7 +34,26 @@ export function canPreview(lines: LyricLine[]): boolean {
 }
 
 export function hasUnsavedChanges(state: SessionState): boolean {
-  return state.revision > state.exportedRevision;
+  return state.revision > state.savedRevision;
+}
+
+export function hasSessionContent(state: SessionState): boolean {
+  return (
+    state.audio !== null ||
+    state.lines.length > 0 ||
+    state.projectPath !== null
+  );
+}
+
+export function getWindowTitle(state: SessionState): string {
+  if (!hasSessionContent(state)) {
+    return 'Euterpe';
+  }
+
+  const name = state.projectPath
+    ? getFileName(state.projectPath)
+    : '未命名.eusrt';
+  return hasUnsavedChanges(state) ? `${name}*` : name;
 }
 
 export function getActiveLineId(

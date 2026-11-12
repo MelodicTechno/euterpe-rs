@@ -29,37 +29,37 @@ export function ConfirmDialog({
   }, [onCancel]);
 
   return (
-    <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-950/70 p-6 backdrop-blur-sm">
+    <div className="fixed inset-0 z-40 flex items-center justify-center bg-ink/20 p-6">
       <div
         role="dialog"
         aria-modal="true"
         aria-labelledby="confirm-dialog-title"
         aria-describedby="confirm-dialog-message"
-        className="w-full max-w-md rounded-2xl border border-slate-700 bg-slate-900 p-6 shadow-2xl"
+        className="w-full max-w-md border border-line bg-surface p-5"
       >
         <h2
           id="confirm-dialog-title"
-          className="text-lg font-semibold text-slate-100"
+          className="text-sm font-semibold text-ink"
         >
           {title}
         </h2>
         <p
           id="confirm-dialog-message"
-          className="mt-3 text-sm leading-6 text-slate-300"
+          className="mt-3 text-xs leading-5 text-muted"
         >
           {message}
         </p>
-        <div className="mt-6 flex justify-end gap-3">
+        <div className="mt-5 flex justify-end gap-2">
           <button
             type="button"
-            className="rounded-lg border border-slate-600 px-4 py-2 text-sm text-slate-200 transition hover:bg-slate-800"
+            className="rounded-sm border border-line px-3 py-1.5 text-xs text-ink transition hover:bg-canvas"
             onClick={onCancel}
           >
             {cancelLabel}
           </button>
           <button
             type="button"
-            className="rounded-lg bg-emerald-500 px-4 py-2 text-sm font-medium text-slate-950 transition hover:bg-emerald-400"
+            className="rounded-sm bg-accent px-3 py-1.5 text-xs text-white transition hover:bg-accent-strong"
             onClick={onConfirm}
           >
             {confirmLabel}

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { findActiveLineId } from './preview';
+import { findActiveLineId, findPreFirstLineId } from './preview';
 import type { LyricLine } from '../state/types';
 
 function line(
@@ -44,5 +44,29 @@ describe('findActiveLineId', () => {
 
     expect(findActiveLineId(overlapping, 1500)).toBe('narrow');
     expect(findActiveLineId(overlapping, 3000)).toBe('wide');
+  });
+});
+
+describe('findPreFirstLineId', () => {
+  const lines = [
+    line('first', null, null),
+    line('early', 1000, 2000),
+    line('later', 5000, 6000),
+  ];
+
+  it('returns the first line before every exportable timestamp', () => {
+    expect(findPreFirstLineId(lines, 0)).toBe('first');
+    expect(findPreFirstLineId(lines, 999)).toBe('first');
+  });
+
+  it('returns null at or after the earliest timestamp', () => {
+    expect(findPreFirstLineId(lines, 1000)).toBeNull();
+    expect(findPreFirstLineId(lines, 1500)).toBeNull();
+    expect(findPreFirstLineId(lines, 6000)).toBeNull();
+  });
+
+  it('returns null when there is nothing exportable', () => {
+    expect(findPreFirstLineId([line('a', null, null)], 0)).toBeNull();
+    expect(findPreFirstLineId([line('a', 1000, 500)], 0)).toBeNull();
   });
 });

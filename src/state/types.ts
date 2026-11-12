@@ -35,6 +35,7 @@ export interface SessionState {
   currentLineId: string | null;
   history: TimingEdit[];
   revision: number;
-  exportedRevision: number;
+  savedRevision: number;
+  projectPath: string | null;
   mode: ViewMode;
 }

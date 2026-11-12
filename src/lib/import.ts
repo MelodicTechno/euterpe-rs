@@ -1,4 +1,4 @@
-export type FileKind = 'audio' | 'lyrics' | 'unsupported';
+export type FileKind = 'audio' | 'lyrics' | 'project' | 'unsupported';
 
 const AUDIO_EXTENSIONS = new Set(['mp3', 'wav']);
 
@@ -20,6 +20,9 @@ export function classifyFile(path: string): FileKind {
   }
   if (extension === 'txt') {
     return 'lyrics';
+  }
+  if (extension === 'eusrt') {
+    return 'project';
   }
   return 'unsupported';
 }

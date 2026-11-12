@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 
-export type ToastKind = 'info' | 'success' | 'error';
+export type ToastKind = 'error' | 'warning';
 
 export interface ToastMessage {
   id: number;
@@ -14,9 +14,8 @@ interface ToastProps {
 }
 
 const STYLES: Record<ToastKind, string> = {
-  info: 'border-sky-400/40 bg-sky-950/95 text-sky-100',
-  success: 'border-emerald-400/40 bg-emerald-950/95 text-emerald-100',
-  error: 'border-rose-400/40 bg-rose-950/95 text-rose-100',
+  warning: 'border-warning/40 bg-surface text-warning',
+  error: 'border-error/40 bg-surface text-error',
 };
 
 export function Toast({ toast, onDismiss }: ToastProps) {
@@ -31,7 +30,7 @@ export function Toast({ toast, onDismiss }: ToastProps) {
   return (
     <div
       role={toast.kind === 'error' ? 'alert' : 'status'}
-      className={`fixed bottom-6 left-1/2 z-50 flex max-w-[min(90vw,42rem)] -translate-x-1/2 items-start gap-3 rounded-xl border px-4 py-3 text-sm shadow-2xl backdrop-blur ${STYLES[toast.kind]}`}
+      className={`fixed bottom-4 left-1/2 z-50 flex max-w-[min(90vw,42rem)] -translate-x-1/2 items-start gap-3 border px-4 py-3 text-xs ${STYLES[toast.kind]}`}
     >
       <span className="whitespace-pre-wrap break-words">{toast.text}</span>
       <button

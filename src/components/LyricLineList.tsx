@@ -24,9 +24,9 @@ const STATUS_TEXT: Record<string, string> = {
 };
 
 const STATUS_STYLES: Record<string, string> = {
-  untimed: 'bg-slate-700/60 text-slate-300',
-  started: 'bg-amber-400/15 text-amber-300',
-  completed: 'bg-emerald-400/15 text-emerald-300',
+  untimed: 'bg-canvas text-muted',
+  started: 'bg-warning/10 text-warning',
+  completed: 'bg-accent-soft text-accent-strong',
 };
 
 function TimeEditor({ line, lineNumber, onCommit }: TimeEditorProps) {
@@ -80,7 +80,7 @@ function TimeEditor({ line, lineNumber, onCommit }: TimeEditorProps) {
   };
 
   const inputClass =
-    'min-w-0 flex-1 rounded-md border bg-slate-950/80 px-2 py-1 font-mono text-xs tabular-nums text-slate-200 outline-none transition focus:border-emerald-400';
+    'min-w-0 flex-1 rounded-none border bg-surface px-2 py-1 font-mono text-xs tabular-nums text-ink outline-none transition focus:border-accent';
 
   return (
     <div className="ml-auto flex w-[17.5rem] max-w-full shrink-0 flex-col items-end gap-1">
@@ -92,9 +92,9 @@ function TimeEditor({ line, lineNumber, onCommit }: TimeEditorProps) {
           id={`start-${line.id}`}
           aria-label={`第${lineNumber}行开始时间`}
           aria-invalid={error !== null}
-          className={`${inputClass} ${error ? 'border-rose-500' : 'border-slate-700'}`}
+          className={`${inputClass} ${error ? 'border-error' : 'border-line'}`}
           value={startDraft}
-          placeholder="开始 00:00:00,000"
+          placeholder="00:00:00,000"
           spellCheck={false}
           onChange={(event) => {
             setStartDraft(event.target.value);
@@ -109,7 +109,7 @@ function TimeEditor({ line, lineNumber, onCommit }: TimeEditorProps) {
             }
           }}
         />
-        <span className="shrink-0 text-slate-600">→</span>
+        <span className="shrink-0 text-muted">→</span>
         <label className="sr-only" htmlFor={`end-${line.id}`}>
           第{lineNumber}行结束时间
         </label>
@@ -117,9 +117,9 @@ function TimeEditor({ line, lineNumber, onCommit }: TimeEditorProps) {
           id={`end-${line.id}`}
           aria-label={`第${lineNumber}行结束时间`}
           aria-invalid={error !== null}
-          className={`${inputClass} ${error ? 'border-rose-500' : 'border-slate-700'}`}
+          className={`${inputClass} ${error ? 'border-error' : 'border-line'}`}
           value={endDraft}
-          placeholder="结束 00:00:00,000"
+          placeholder="00:00:00,000"
           spellCheck={false}
           onChange={(event) => {
             setEndDraft(event.target.value);
@@ -136,7 +136,7 @@ function TimeEditor({ line, lineNumber, onCommit }: TimeEditorProps) {
         />
       </div>
       {error && (
-        <p role="alert" className="text-xs text-rose-400">
+        <p role="alert" className="text-xs text-error">
           {error}
         </p>
       )}
@@ -167,7 +167,7 @@ export function LyricLineList({
 
   if (lines.length === 0) {
     return (
-      <div className="flex flex-1 items-center justify-center rounded-2xl border border-dashed border-slate-700 text-sm text-slate-500">
+      <div className="flex flex-1 items-center justify-center border border-dashed border-line bg-surface text-xs text-muted">
         导入 txt 歌词后，这里会显示每一行。
       </div>
     );
@@ -177,9 +177,9 @@ export function LyricLineList({
     <section
       ref={containerRef}
       aria-label="歌词列表"
-      className="lyric-scroll min-w-0 flex-1 overflow-x-hidden overflow-y-auto rounded-2xl border border-slate-800 bg-slate-900/40"
+      className="lyric-scroll min-w-0 flex-1 overflow-x-hidden overflow-y-auto bg-surface"
     >
-      <ol className="divide-y divide-slate-800/80">
+      <ol className="divide-y divide-line">
         {lines.map((line, index) => {
           const status = getLineStatus(line);
           const isCurrent = line.id === currentLineId;
@@ -192,27 +192,27 @@ export function LyricLineList({
               data-testid={`lyric-line-${line.id}`}
               data-current={isCurrent}
               data-invalid={isInvalid}
-              className={`flex flex-wrap items-center gap-3 px-4 py-3 transition ${
+              className={`flex flex-wrap items-center gap-3 border-l-2 px-3 py-2 transition ${
                 isCurrent
-                  ? 'border-l-2 border-emerald-400 bg-emerald-400/5'
-                  : 'border-l-2 border-transparent hover:bg-slate-800/40'
-              } ${isInvalid ? 'ring-1 ring-inset ring-rose-500/70' : ''}`}
+                  ? 'border-accent bg-accent-soft/60'
+                  : 'border-transparent hover:bg-canvas'
+              } ${isInvalid ? 'ring-1 ring-inset ring-error/60' : ''}`}
               onClick={() => onSelectLine(line.id)}
             >
-              <span className="w-6 shrink-0 font-mono text-xs tabular-nums text-slate-500">
+              <span className="w-6 shrink-0 font-mono text-[11px] tabular-nums text-muted">
                 {String(index + 1).padStart(2, '0')}
               </span>
 
               <div className="min-w-0 flex-1 basis-48">
                 <p
-                  className={`truncate text-sm ${
-                    isCurrent ? 'font-semibold text-slate-100' : 'text-slate-300'
+                  className={`truncate text-xs ${
+                    isCurrent ? 'font-medium text-ink' : 'text-ink/80'
                   }`}
                 >
                   {line.text}
                 </p>
                 <span
-                  className={`mt-1 inline-block rounded-full px-2 py-0.5 text-[11px] ${STATUS_STYLES[status]}`}
+                  className={`mt-1 inline-block px-1.5 py-0.5 text-[10px] ${STATUS_STYLES[status]}`}
                 >
                   {STATUS_TEXT[status]}
                 </span>
