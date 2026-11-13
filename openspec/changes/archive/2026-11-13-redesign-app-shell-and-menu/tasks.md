@@ -33,7 +33,7 @@
 - [x] 5.1 在 `src/index.css` 增加浅色主题 tokens、浅蓝选区和浅灰滚动条；用 `npm run build` 确认 Tailwind 变量可用
 - [x] 5.2 将 App 壳层、`PlayerBar`、`PreviewBar`、`ImportDropzone`、`LyricLineList`、`LyricPreview`、`ConfirmDialog`、`InfoDialog`、`Toast` 全部换成白色/浅灰、细边框、低饱和蓝、无阴影/渐变/模糊/大面积圆角；逐组件手工检查深色类名是否清理
 - [x] 5.3 更新依赖类名断言的测试，并增加关键容器的浅色扁平结构断言；用 `npm test` 确认样式相关测试全绿
-- [ ] 5.4 更新 `README.md` 的界面说明为浅色扁平主题；在 Tauri 中手工对照 Ableton 风格，确认背景、强调色、滚动条和选区符合预期
+- [x] 5.4 更新 `README.md` 的界面说明为浅色扁平主题；在 Tauri 中手工对照 Ableton 风格，确认背景、强调色、滚动条和选区符合预期
 
 ## 6. 极简图标
 
@@ -43,7 +43,7 @@
 ## 7. 集成验收
 
 - [x] 7.1 运行 `npm test` 与 `npm run build`，确认全部测试通过且 TypeScript 无错误
-- [ ] 7.2 在 Tauri 中手工走查：File 菜单导入/保存/另存为/导出/退出、Settings 快捷键帮助、Help 关于、窗口标题 `*` 变化、成功操作无通知、错误仍提示、右键无菜单、预览切换禁用/返回、白色扁平蓝主题与极简图标
+- [x] 7.2 在 Tauri 中手工走查：File 菜单导入/保存/另存为/导出/退出、Settings 快捷键帮助、Help 关于、窗口标题 `*` 变化、成功操作无通知、错误仍提示、右键无菜单、预览切换禁用/返回、白色扁平蓝主题与极简图标
 
 ## Workflow follow-up
 
